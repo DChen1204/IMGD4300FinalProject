@@ -1,0 +1,86 @@
+/* style.css */
+
+/* Ensure the canvas fills the entire page and has no scrollbars */
+body {
+    margin: 0;
+    overflow: hidden;
+    background-color: #0a0a0f;
+}
+
+/* Style the canvas to take up the full viewport */
+canvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+}
+
+/* The control panel style */
+.controls {
+
+    /* Position */
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    z-index: 10;
+
+    /* Appearance */
+    background-color: rgba(0, 0, 0, 0.5);
+    padding: 15px;
+    border-radius: 8px;
+    color: white;
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 14px;
+
+    /* Layout */
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+
+}
+.control-group {
+    display: flex;
+    flex-direction: column;
+}
+.control-group label {
+    margin-bottom: 5px;
+}
+
+/* Slider styles */
+input[type=range] {
+    cursor: pointer;
+    width: 200px;
+}
+
+/* Button styles */
+.vant-buttons {
+    display: flex;
+    gap: 6px;
+}
+.vant-btn {
+    flex: 1;
+    padding: 6px 10px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    font-family: 'Times New Roman', Times, serif;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.vant-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.6);
+}
+.vant-btn.active {
+    background: rgba(1, 255, 22, 0.4);
+    border-color: #3eb12e;
+    color: #fff;
+}
+
+.legend {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    font-size: 14px;
+}
