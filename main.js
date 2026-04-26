@@ -65,7 +65,7 @@ const fragmentModule = device.createShaderModule({
 //=====================================================================================
 
 // Simulation Parameters
-const NUM_BOIDS = 500;
+const NUM_BOIDS = 150;
 const MAX_SPEED = 300.0;
 const MAX_FORCE = 3.0;
 const SEPARATION_RADIUS = 35.0;
@@ -76,13 +76,33 @@ const SEPARATION_WEIGHT = 2.5;
 const ALIGNMENT_WEIGHT = 1.0;
 const COHESION_WEIGHT = 1.0;
 // Buffer sizes
-const BOID_DATA_SIZE = 4;
-const UNIFORM_DATA_SIZE = 20;
+const BOID_DATA_SIZE = 6;
+const UNIFORM_DATA_SIZE = 24;
+// Bounds for 3D space
+const BOUNDS_X = canvas.width;
+const BOUNDS_Y = canvas.height;
+const BOUNDS_Z = 600.0;
 // Mouse tracking
 let mouseX = 0;
 let mouseY = 0;
 let mouseActive = 0;    // 0 = none, 1 = on
 let mouseMode = 0;      // 0 = repel, 1 = attract
+// Camera
+let cameraAngle = 0.0;
+const cameraDistance = 800.0;
+const cameraHeight = 400.0;
+function getCameraPosition() {
+    return {
+        x: Math.cos(cameraAngle) * cameraDistance + BOUNDS_X / 2,
+        y: cameraHeight,
+        z: Math.sin(cameraAngle) * cameraDistance + BOUNDS_Z / 2
+    };
+}
+const cameraTarget = {
+    x: BOUNDS_X / 2,
+    y: BOUNDS_Y / 2,
+    z: BOUNDS_Z / 2
+};
 
 // Boid Data Array
 const boidsData = new Float32Array(NUM_BOIDS * BOID_DATA_SIZE);
@@ -92,12 +112,15 @@ for (let i = 0; i < NUM_BOIDS; i++) {
     // Randomize position
     boidsData[idx + 0] = Math.random() * canvas.width;
     boidsData[idx + 1] = Math.random() * canvas.height;
+    boidsData[idx + 2] = Math.random() * BOUNDS_Z;
 
     // Randomize initial velocity
-    const angle = Math.random() * Math.PI * 2;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.random() * Math.PI - Math.PI / 2;
     const speed = MAX_SPEED * 0.5;
-    boidsData[idx + 2] = Math.cos(angle) * speed;
-    boidsData[idx + 3] = Math.sin(angle) * speed;
+    boidsData[idx + 3] = Math.cos(theta) * Math.cos(phi) * speed;
+    boidsData[idx + 4] = Math.sin(phi) * speed;
+    boidsData[idx + 5] = Math.sin(theta) * Math.cos(phi) * speed;
 }
 
 // Uniform Data Array
@@ -106,23 +129,27 @@ uniformData[0] = 0.0;               // time
 uniformData[1] = 0.0;               // deltatime
 uniformData[2] = canvas.width;
 uniformData[3] = canvas.height;
-uniformData[4] = NUM_BOIDS;
-uniformData[5] = MAX_SPEED;
-uniformData[6] = MAX_FORCE;
-uniformData[7] = SEPARATION_RADIUS;
-uniformData[8] = ALIGNMENT_RADIUS;
-uniformData[9] = COHESION_RADIUS;
-uniformData[10] = SEPARATION_WEIGHT;
-uniformData[11] = ALIGNMENT_WEIGHT; 
-uniformData[12] = COHESION_WEIGHT;
-uniformData[13] = 0.0;              // mouseX
-uniformData[14] = 0.0;              // mouseY
-uniformData[15] = 0.0;              // mouseActive
-uniformData[16] = 0.0;              // mouseMode
+uniformData[4] = BOUNDS_Z;
+uniformData[5] = NUM_BOIDS;
+uniformData[6] = MAX_SPEED;
+uniformData[7] = MAX_FORCE;
+uniformData[8] = SEPARATION_RADIUS;
+uniformData[9] = ALIGNMENT_RADIUS;
+uniformData[10] = COHESION_RADIUS;
+uniformData[11] = SEPARATION_WEIGHT;
+uniformData[12] = ALIGNMENT_WEIGHT; 
+uniformData[13] = COHESION_WEIGHT;
+uniformData[14] = 0.0;              // mouseX
+uniformData[15] = 0.0;              // mouseY
+uniformData[16] = 0.0;              // mouseActive
+uniformData[17] = 0.0;              // mouseMode
+uniformData[18] = 0.0;              // cameraPosX
+uniformData[19] = 0.0;              // cameraPosY
+uniformData[20] = 0.0;              // cameraPosZ
+uniformData[21] = 0.0;              // cameraTargetX
+uniformData[22] = 0.0;              // cameraTargetY
+uniformData[23] = 0.0;              // cameraTargetZ
 // paddings
-uniformData[17] = 0.0;
-uniformData[18] = 0.0;
-uniformData[19] = 0.0;
 
 //=====================================================================================
 //=====================================================================================
@@ -277,7 +304,7 @@ mouseToggle.addEventListener('click', () => {
     mouseActive = 1 - mouseActive;
     mouseToggle.classList.toggle('active');
     updateModeLabel();
-})
+});
 
 // Update mode label
 function updateModeLabel() {
@@ -291,6 +318,12 @@ function updateModeLabel() {
         modeLabel.textContent = 'Mode: ATTRACT (click to switch)';
     }
 }
+
+// Orbit camera with arrow keys
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') cameraAngle -= 0.05;
+    if (e.key === 'ArrowRight') cameraAngle += 0.05;
+});
 
 
 //=====================================================================================
@@ -314,10 +347,22 @@ function render(timestamp) {
     uniformData[1] = deltaTime;               
     uniformData[2] = canvas.width;
     uniformData[3] = canvas.height;
-    uniformData[13] = mouseX;
-    uniformData[14] = mouseY;
-    uniformData[15] = mouseActive;
-    uniformData[16] = mouseMode;
+    
+    // mouse values
+    uniformData[14] = mouseX;
+    uniformData[15] = mouseY;
+    uniformData[16] = mouseActive;
+    uniformData[17] = mouseMode;
+
+    // camera values
+    const cam = getCameraPosition();
+    uniformData[18] = cam.x;
+    uniformData[19] = cam.y;
+    uniformData[20] = cam.z;
+    uniformData[21] = cameraTarget.x;
+    uniformData[22] = cameraTarget.y;
+    uniformData[23] = cameraTarget.z;
+    
     device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
     // Create a command encoder (used to record commands that will be sent to the GPU)
@@ -346,7 +391,7 @@ function render(timestamp) {
     // Run render shader 
     renderPass.setPipeline(renderPipeline);
     renderPass.setBindGroup(0, renderBindGroup);
-    renderPass.draw(3, NUM_BOIDS);
+    renderPass.draw(12, NUM_BOIDS);
     renderPass.end();
 
     // Submit the recorded commands to the GPU for execution

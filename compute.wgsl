@@ -1,14 +1,15 @@
 
 // Structs
 struct Boid {
-    pos: vec2f,
-    vel: vec2f,
+    pos: vec3f,
+    vel: vec3f,
 };
 struct Uniforms {
     time: f32,
     deltaTime: f32,
     width: f32,
     height: f32,
+    depth: f32,
     numBoids: f32,
     maxSpeed: f32,
     maxForce: f32,
@@ -22,20 +23,29 @@ struct Uniforms {
     mouseY: f32,
     mouseActive: f32,
     mouseMode: f32,
-    pad1: f32,
-    pad2: f32,
-    pad3: f32,
+    cameraPosX: f32,
+    cameraPosY: f32,
+    cameraPosZ: f32,
+    cameraTargetX: f32,
+    cameraTargetY: f32,
+    cameraTargetZ: f32,
 };
+
+//=====================================================================================
+//=====================================================================================
 
 // Bindings
 @group(0) @binding(0) var<storage, read> boidsIn: array<Boid>;
 @group(0) @binding(1) var<storage, read_write> boidsOut: array<Boid>;
 @group(0) @binding(2) var<uniform> uniforms: Uniforms;
 
+//=====================================================================================
+//=====================================================================================
+
 // Helper Functions
 
-// Calculate the shortest distance between two points
-fn torodialDistance(a: vec2f, b: vec2f) -> vec2f {
+// Calculate the shortest distance between two points (3D)
+fn torodialDistance(a: vec3f, b: vec3f) -> vec3f {
     var diff = b - a;
 
     // Wrap around the edges
@@ -43,12 +53,14 @@ fn torodialDistance(a: vec2f, b: vec2f) -> vec2f {
     if (diff.x < -uniforms.width * 0.5) { diff.x += uniforms.width; }
     if (diff.y > uniforms.height * 0.5) { diff.y -= uniforms.height; }
     if (diff.y < -uniforms.height * 0.5) { diff.y += uniforms.height; }
+    if (diff.z > uniforms.depth * 0.5) { diff.z -= uniforms.depth; }
+    if (diff.z < -uniforms.depth * 0.5) { diff.z += uniforms.depth; }
 
     return diff;
 }
 
-// Limit a vector's magnitude to the max value
-fn limit(vec: vec2f, max: f32) -> vec2f {
+// Limit a vector's magnitude to the max value (3D)
+fn limit(vec: vec3f, max: f32) -> vec3f {
     let lengthSq = dot(vec, vec);
     if (lengthSq > max * max) {
         return normalize(vec) * max;
@@ -56,15 +68,20 @@ fn limit(vec: vec2f, max: f32) -> vec2f {
     return vec;
 }
 
-// Wrap a position around the canvas edges
-fn wrapPosition(pos: vec2f) -> vec2f {
+// Wrap a position around the canvas edges (3D)
+fn wrapPosition(pos: vec3f) -> vec3f {
     var p = pos;
     if (p.x < 0.0) { p.x += uniforms.width; }
     if (p.x >= uniforms.width) { p.x -= uniforms.width; }
     if (p.y < 0.0) { p.y += uniforms.height; }
     if (p.y >= uniforms.height) { p.y -= uniforms.height; }
+    if (p.z < 0.0) { p.z += uniforms.depth; }
+    if (p.z >= uniforms.depth) { p.z -= uniforms.depth; }
     return p;
 }
+
+//=====================================================================================
+//=====================================================================================
 
 // Main Function
 @compute @workgroup_size(64)
@@ -79,9 +96,9 @@ fn cs(@builtin(global_invocation_id) global_id: vec3u) {
     let currentBoid = boidsIn[idx];
 
     // Force vectors and counters
-    var separationForce = vec2f(0.0, 0.0);
-    var alignmentForce = vec2f(0.0, 0.0);
-    var cohesionForce = vec2f(0.0, 0.0);
+    var separationForce = vec3f(0.0, 0.0, 0.0);
+    var alignmentForce = vec3f(0.0, 0.0, 0.0);
+    var cohesionForce = vec3f(0.0, 0.0, 0.0);
     var separationCount = 0.0;
     var alignmentCount = 0.0;
     var cohesionCount = 0.0;
@@ -151,13 +168,13 @@ fn cs(@builtin(global_invocation_id) global_id: vec3u) {
 
     // Mouse interaction
     if (uniforms.mouseActive > 0.5) {
-        let mousePos = vec2f(uniforms.mouseX, uniforms.mouseY);
+        let mousePos = vec3f(uniforms.mouseX, uniforms.mouseY, 0.0);
         let diff = torodialDistance(currentBoid.pos, mousePos);
         let dist = length(diff);
         let mouseRadius = 150.0;
 
         if (dist < mouseRadius && dist > 0.0) {
-            var mouseForce = vec2f(0.0);
+            var mouseForce = vec3f(0.0);
             let strength = 1.0 - (dist / mouseRadius);
 
             // Repel

@@ -1,14 +1,15 @@
 
 // Structs
 struct Boid {
-    pos: vec2f,
-    vel: vec2f,
+    pos: vec3f,
+    vel: vec3f,
 };
 struct Uniforms {
     time: f32,
     deltaTime: f32,
     width: f32,
     height: f32,
+    depth: f32,
     numBoids: f32,
     maxSpeed: f32,
     maxForce: f32,
@@ -22,9 +23,12 @@ struct Uniforms {
     mouseY: f32,
     mouseActive: f32,
     mouseMode: f32,
-    pad1: f32,
-    pad2: f32,
-    pad3: f32,
+    cameraPosX: f32,
+    cameraPosY: f32,
+    cameraPosZ: f32,
+    cameraTargetX: f32,
+    cameraTargetY: f32,
+    cameraTargetZ: f32,
 };
 struct VertexInput {
     @builtin(vertex_index) vertexIndex: u32,
@@ -35,16 +39,59 @@ struct VertexOutput {
     @location(0) vColor: vec3f,
 };
 
+//=====================================================================================
+//=====================================================================================
+
 // Bindings
 @group(0) @binding(0) var<storage, read> boids: array<Boid>;
 @group(0) @binding(1) var<uniform> uniforms: Uniforms;
 
-// Rotation Matrix
-fn rotate2d(angle: f32) -> mat2x2f {
-    let c = cos(angle);
-    let s = sin(angle);
-    return mat2x2f(c, s, -s, c);
+//=====================================================================================
+//=====================================================================================
+
+// View matrix (world space -> camera space)
+fn lookAt(eye: vec3f, lookAt: vec3f, up: vec3f) -> mat4x4f {
+    let forward = normalize(lookAt - eye);
+    let right = normalize(cross(forward, up));
+    let newUp = cross(right, forward);
+
+    return mat4x4f(
+        vec4f(right.x, newUp.x, -forward.x, 0.0),
+        vec4f(right.y, newUp.y, -forward.y, 0.0),
+        vec4f(right.z, newUp.z, -forward.z, 0.0),
+        vec4f(-dot(right, eye), -dot(newUp, eye), dot(forward, eye), 1.0)
+    );
 }
+
+// Projection matrix (camera space -> clip space)
+fn perspective(fov: f32, aspect: f32, near: f32, far: f32) -> mat4x4f {
+    let f = 1.0 / tan(fov * 0.5);
+    let rangeInv = 1.0 / (near - far);
+
+    return mat4x4f(
+        vec4f(f / aspect, 0.0, 0.0, 0.0),
+        vec4f(0.0, f, 0.0, 0.0),
+        vec4f(0.0, 0.0, (near + far) * rangeInv, -1.0),
+        vec4f(0.0, 0.0, near * far * rangeInv * 2.0, 0.0)
+    );
+}
+
+// Rotation Matrix (align boid with velocity direction)
+fn rotate(velocity: vec3f) -> mat3x3f {
+    let forward = normalize(velocity);
+    let worldUp = vec3f(0.0, 1.0, 0.0);
+    let right = normalize(cross(worldUp, forward) + vec3f(0.0001, 0.0, 0.0001));
+    let up = cross(forward, right);
+
+    return mat3x3f(
+        right,
+        up,
+        forward
+    );
+}
+
+//=====================================================================================
+//=====================================================================================
 
 // Main Function
 @vertex
@@ -52,28 +99,40 @@ fn vs(input: VertexInput) -> VertexOutput {
 
     let boid = boids[input.instanceIndex];
 
-    // Triangle vertices centered at the origin
-    var pos = array<vec2f, 3>(
-        vec2f(-0.5, -0.3),
-        vec2f(-0.5, 0.3),
-        vec2f(0.5, 0.0),
+    // 3D bird-like shape
+    var pos = array<vec3f, 4>(
+        vec3f(0.0, 0.0, 1.0),
+        vec3f(-0.5, 0.3, -0.5),
+        vec3f(0.5, 0.3, -0.5),
+        vec3f(0.0, -0.2, -0.5),
+    );
+    var indices = array<u32, 12>(
+        0u, 1u, 2u,
+        0u, 2u, 3u,
+        0u, 3u, 1u,
+        1u, 3u, 2u,
     );
 
-    // Scale the triangle
+    // Scale the bird
     let size = 8.0;
-    var vertexPos = pos[input.vertexIndex] * size;
+    var vertexPos = pos[indices[input.vertexIndex]] * size;
 
     // Rotate to the velocity
-    let angle = atan2(boid.vel.y, boid.vel.x);
-    let rotMatrix = rotate2d(angle);
+    let rotMatrix = rotate(boid.vel);
     vertexPos = rotMatrix * vertexPos;
 
     // Translate to boid position
-    vertexPos += boid.pos;
+    let worldPos = vertexPos + boid.pos;
 
-    // Conver to clip space
-    let clipX = (vertexPos.x / uniforms.width) * 2.0 - 1.0;
-    let clipY = 1.0 - (vertexPos.y / uniforms.height) * 2.0;
+    // Camera setup
+    let cameraPos = vec3f(uniforms.cameraPosX, uniforms.cameraPosY, uniforms.cameraPosZ);
+    let cameraTarget = vec3f(uniforms.cameraTargetX, uniforms.cameraTargetY, uniforms.cameraTargetZ);
+    let aspect = uniforms.width / uniforms.height;
+    let viewMatrix = lookAt(cameraPos, cameraTarget, vec3f(0.0, 1.0, 0.0));
+    let projMatrix = perspective(1.0, aspect, 1.0, 2000.0);
+
+    // Convert to clip space
+    let clipPos = projMatrix * viewMatrix * vec4f(worldPos, 1.0);
 
     // Color based on speed
     let speed = length(boid.vel) / uniforms.maxSpeed;
@@ -85,8 +144,7 @@ fn vs(input: VertexInput) -> VertexOutput {
 
     // Return position and color 
     var output: VertexOutput;
-    output.position = vec4f(clipX, clipY, 0.0, 1.0);
+    output.position = clipPos;
     output.vColor = color;
     return output;
-
 }
