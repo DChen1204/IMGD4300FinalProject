@@ -46,12 +46,14 @@ async function loadShader(url) {
 const vertexShader = await loadShader("vertex.wgsl");
 const fragmentShader = await loadShader("fragment.wgsl");
 const computeShader = await loadShader("compute.wgsl");
+const backgroundShader = await loadShader("background.wgsl");
 
 // Shader modules (compile shader code to be used by the GPU)
 const computeModule = device.createShaderModule({
     label: "Compute Shader Module",
     code: computeShader,
 });
+
 const vertexModule = device.createShaderModule({
     label: "Vertex Shader Module",
     code: vertexShader,
@@ -61,11 +63,16 @@ const fragmentModule = device.createShaderModule({
     code: fragmentShader,
 });
 
+const backgroundModule = device.createShaderModule({
+    label: "Background Shader Module",
+    code: backgroundShader,
+});
+
 //=====================================================================================
 //=====================================================================================
 
 // Simulation Parameters
-const NUM_BOIDS = 150;
+const NUM_BOIDS = 1500;
 const MAX_SPEED = 300.0;
 const MAX_FORCE = 3.0;
 const SEPARATION_RADIUS = 35.0;
@@ -259,8 +266,27 @@ const computePipeline = device.createComputePipeline({
         entryPoint: "cs",
     }
 });
-const renderPipeline = device.createRenderPipeline({
-    label: "Render Pipeline",
+const backgroundPipeline = device.createRenderPipeline({
+    label: "Background Pipeline",
+    layout: renderPipelineLayout,
+    vertex: {
+        module: backgroundModule,
+        entryPoint: "vs",
+        buffers: [],
+    },
+    fragment: {
+        module: backgroundModule,
+        entryPoint: "fs",
+        targets: [{
+            format: canvasFormat,
+        }],
+    },
+    primitive: {
+        topology: "triangle-list",
+    },
+});
+const boidPipeline = device.createRenderPipeline({
+    label: "Boid Pipeline",
     layout: renderPipelineLayout,
     vertex: {
         module: vertexModule,
@@ -286,8 +312,9 @@ const renderPipeline = device.createRenderPipeline({
 
 // Track mouse position
 canvas.addEventListener('mousemove', (e) => {
-    mouseX = e.clientX;
-    mouseY = e.clientY;
+    const rect = canvas.getBoundingClientRect();
+    mouseX = (e.clientX - rect.left) / canvas.width;
+    mouseY = (e.clientY - rect.top) / canvas.height;
 });
 
 // left click toggles between repel/attract mode
@@ -378,8 +405,8 @@ function render(timestamp) {
     // Select the output buffer
     const renderBindGroup = renderBindGroups[1 - currentBuffer];
 
-    // Begin render pass
-    const renderPass = encoder.beginRenderPass({
+    // Run background render pass 
+    const backgroundRenderPass = encoder.beginRenderPass({
         colorAttachments: [{
             view: context.getCurrentTexture().createView(),
             loadOp: "clear",
@@ -387,12 +414,24 @@ function render(timestamp) {
             storeOp: "store",
         }]
     });
+    backgroundRenderPass.setPipeline(backgroundPipeline);
+    backgroundRenderPass.setBindGroup(0, renderBindGroup);
+    backgroundRenderPass.draw(6);
+    backgroundRenderPass.end();
 
-    // Run render shader 
-    renderPass.setPipeline(renderPipeline);
-    renderPass.setBindGroup(0, renderBindGroup);
-    renderPass.draw(12, NUM_BOIDS);
-    renderPass.end();
+    // Run boid render pass
+    const boidRenderPass = encoder.beginRenderPass({
+        colorAttachments: [{
+            view: context.getCurrentTexture().createView(),
+            loadOp: "load",
+            storeOp: "store",
+        }]
+    });
+    boidRenderPass.setPipeline(boidPipeline);
+    boidRenderPass.setBindGroup(0, renderBindGroup);
+    boidRenderPass.draw(12, NUM_BOIDS);
+    boidRenderPass.end();
+
 
     // Submit the recorded commands to the GPU for execution
     device.queue.submit([encoder.finish()]);

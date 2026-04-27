@@ -80,6 +80,44 @@ fn wrapPosition(pos: vec3f) -> vec3f {
     return p;
 }
 
+// Convert 2d mouse coordinate to its 3d direction ray 
+fn getMouseRay() -> vec3f {
+    
+    // Camera set up
+    let cameraPos = vec3f(uniforms.cameraPosX, uniforms.cameraPosY, uniforms.cameraPosZ);
+    let cameraTarget = vec3f(uniforms.cameraTargetX, uniforms.cameraTargetY, uniforms.cameraTargetZ);
+    let forward = normalize(cameraTarget - cameraPos);
+    let worldUp = vec3f(0.0, 1.0, 0.0);
+    let right = normalize(cross(worldUp, forward) + vec3f(0.0001, 0.0, 0.0001));
+    let up = cross(forward, right);
+    
+    // Get the 3d direction ray from the camera to the mouse
+    let fov = 1.5;
+    let aspect = uniforms.width / uniforms.height;
+    let rd = normalize(
+        forward 
+        + (uniforms.mouseX - 0.5) * right * fov * aspect 
+        + (0.5 - uniforms.mouseY) * up * fov
+    );
+    return rd;
+}
+
+// Get the distance from a point to a ray
+// Used to get the distance between the boid and the mouse array
+fn distToRay(point: vec3f, rayOrigin: vec3f, rayDir: vec3f) -> f32 {
+    let v = point - rayOrigin;
+    let t = dot(v, rayDir);                
+    let closest = rayOrigin + rayDir * t;  
+    return length(point - closest);         
+}
+
+// Get the closest point on a ray to a given point
+fn closestPointOnRay(point: vec3f, rayOrigin: vec3f, rayDir: vec3f) -> vec3f {
+    let v = point - rayOrigin;
+    let t = dot(v, rayDir);
+    return rayOrigin + rayDir * t;
+}
+
 //=====================================================================================
 //=====================================================================================
 
@@ -166,26 +204,39 @@ fn cs(@builtin(global_invocation_id) global_id: vec3u) {
     newVel += alignmentForce * uniforms.alignmentWeight;
     newVel += cohesionForce * uniforms.cohesionWeight;
 
-    // Mouse interaction
+    // #D Mouse interaction
     if (uniforms.mouseActive > 0.5) {
-        let mousePos = vec3f(uniforms.mouseX, uniforms.mouseY, 0.0);
-        let diff = torodialDistance(currentBoid.pos, mousePos);
-        let dist = length(diff);
-        let mouseRadius = 150.0;
 
+        // Get the camera
+        let cameraPos = vec3f(uniforms.cameraPosX, uniforms.cameraPosY, uniforms.cameraPosZ);
+        
+        // Get the ray from the camera to the mouse
+        let rayDir = getMouseRay();
+
+        // Get the distance of the current boid to the mouse array 
+        let dist = distToRay(currentBoid.pos, cameraPos, rayDir);
+        
+        // The range of the mouse' area of effect
+        let mouseRadius = 250.0;
+
+        // If the boid is close to the mouse
         if (dist < mouseRadius && dist > 0.0) {
+
+            // Find the ray from the boid to the mouse ray 
+            let closest = closestPointOnRay(currentBoid.pos, cameraPos, rayDir);
+            let toRay = closest - currentBoid.pos;
+            let dir = normalize(toRay + vec3f(0.0001));
+
             var mouseForce = vec3f(0.0);
             let strength = 1.0 - (dist / mouseRadius);
 
             // Repel
             if (uniforms.mouseMode < 0.5) {
-                mouseForce = -normalize(diff) * strength * 800.0;
+                mouseForce = -dir * strength * 800.0;
             }
             // Attract
             else {
-                let desiredVel = normalize(diff) * uniforms.maxSpeed;
-                mouseForce = desiredVel - currentBoid.vel;
-                mouseForce = limit(mouseForce, uniforms.maxForce * 2.0);
+                mouseForce = dir * strength * 800.0;
             }
 
             newVel += mouseForce;

@@ -37,6 +37,7 @@ struct VertexInput {
 struct VertexOutput {
     @builtin(position) position: vec4f,
     @location(0) vColor: vec3f,
+    @location(1) vNormal: vec3f,
 };
 
 //=====================================================================================
@@ -117,9 +118,22 @@ fn vs(input: VertexInput) -> VertexOutput {
     let size = 8.0;
     var vertexPos = pos[indices[input.vertexIndex]] * size;
 
+    // Normals for each face
+    var vertexNormal: vec3f;
+    if (input.vertexIndex < 3) {
+        vertexNormal = vec3f(0.0, 1.0, 0.0);
+    } else if (input.vertexIndex < 6) {
+        vertexNormal = vec3f(1.0, 0.0, 0.0);
+    } else if (input.vertexIndex < 9) {
+        vertexNormal = vec3f(-1.0, 0.0, 0.0);
+    } else {
+        vertexNormal = vec3f(0.0, -1.0, 0.0);
+    }
+
     // Rotate to the velocity
     let rotMatrix = rotate(boid.vel);
     vertexPos = rotMatrix * vertexPos;
+    vertexNormal = rotMatrix * vertexNormal;
 
     // Translate to boid position
     let worldPos = vertexPos + boid.pos;
@@ -142,9 +156,10 @@ fn vs(input: VertexInput) -> VertexOutput {
         speed
     );
 
-    // Return position and color 
+    // Return position, color, and normal
     var output: VertexOutput;
     output.position = clipPos;
     output.vColor = color;
+    output.vNormal = vertexNormal;
     return output;
 }
