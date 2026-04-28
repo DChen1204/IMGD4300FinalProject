@@ -108,7 +108,7 @@ fn getGroundColor(hitPos: vec3f) -> vec3f {
     let gridX = step(0.9, fract(hitPos.x / scale));
     let gridZ = step(0.9, fract(hitPos.z / scale));
     let grid = max(gridX, gridZ);
-    let matColor = mix(baseColor, vec3f(0.4, 0.9, 0.9), grid);
+    var matColor = mix(baseColor, vec3f(0.4, 0.9, 0.9), grid);
 
     // lighting
     let sunDir = normalize(vec3f(0.3, 1.0, 0.5));

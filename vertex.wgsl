@@ -38,6 +38,7 @@ struct VertexOutput {
     @builtin(position) position: vec4f,
     @location(0) vColor: vec3f,
     @location(1) vNormal: vec3f,
+    @location(2) vWorldPos: vec3f,
 };
 
 //=====================================================================================
@@ -161,5 +162,6 @@ fn vs(input: VertexInput) -> VertexOutput {
     output.position = clipPos;
     output.vColor = color;
     output.vNormal = vertexNormal;
+    output.vWorldPos = worldPos;
     return output;
 }

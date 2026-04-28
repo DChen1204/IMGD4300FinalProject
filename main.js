@@ -72,7 +72,7 @@ const backgroundModule = device.createShaderModule({
 //=====================================================================================
 
 // Simulation Parameters
-const NUM_BOIDS = 1500;
+const NUM_BOIDS = 2000;
 const MAX_SPEED = 300.0;
 const MAX_FORCE = 3.0;
 const SEPARATION_RADIUS = 35.0;
