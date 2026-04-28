@@ -78,38 +78,45 @@ const MAX_FORCE = 3.0;
 const SEPARATION_RADIUS = 35.0;
 const ALIGNMENT_RADIUS = 100.0;
 const COHESION_RADIUS = 100.0;
+
 // Rule Weights
 const SEPARATION_WEIGHT = 2.5;
 const ALIGNMENT_WEIGHT = 1.0;
 const COHESION_WEIGHT = 1.0;
+
 // Buffer sizes
 const BOID_DATA_SIZE = 6;
 const UNIFORM_DATA_SIZE = 24;
+
 // Bounds for 3D space
 const BOUNDS_X = canvas.width;
 const BOUNDS_Y = canvas.height;
 const BOUNDS_Z = 600.0;
+
 // Mouse tracking
 let mouseX = 0;
 let mouseY = 0;
 let mouseActive = 0;    // 0 = none, 1 = on
 let mouseMode = 0;      // 0 = repel, 1 = attract
+
 // Camera
 let cameraAngle = 0.0;
-const cameraDistance = 800.0;
-const cameraHeight = 400.0;
+let cameraDistance = 800.0;
+let cameraPhi = 0.5;
+let cameraTargetX = BOUNDS_X / 2;
+let cameraTargetY = BOUNDS_Y / 2;
+let cameraTargetZ = BOUNDS_Z / 2;
+let isDragging = false;
+let lastMouseX = 0;
+let lastMouseY = 0;
 function getCameraPosition() {
     return {
-        x: Math.cos(cameraAngle) * cameraDistance + BOUNDS_X / 2,
-        y: cameraHeight,
-        z: Math.sin(cameraAngle) * cameraDistance + BOUNDS_Z / 2
+        x: cameraTargetX + cameraDistance * Math.cos(cameraPhi) * Math.sin(cameraAngle),
+        y: cameraTargetY + cameraDistance * Math.sin(cameraPhi),
+        z: cameraTargetZ + cameraDistance * Math.cos(cameraPhi) * Math.cos(cameraAngle)
     };
 }
-const cameraTarget = {
-    x: BOUNDS_X / 2,
-    y: BOUNDS_Y / 2,
-    z: BOUNDS_Z / 2
-};
+
 
 // Boid Data Array
 const boidsData = new Float32Array(NUM_BOIDS * BOID_DATA_SIZE);
@@ -310,19 +317,77 @@ const boidPipeline = device.createRenderPipeline({
 
 // HTML Elements
 
-// Track mouse position
+// Update sliders
+const sepSlider = document.getElementById("sepSlider");
+const aliSlider = document.getElementById("aliSlider");
+const cohSlider = document.getElementById("cohSlider");
+const sepVal = document.getElementById("sepVal");
+const aliVal = document.getElementById("aliVal");
+const cohVal = document.getElementById("cohVal");
+sepSlider.addEventListener("input", () => {
+    sepVal.textContent = sepSlider.value;
+});
+aliSlider.addEventListener("input", () => {
+    aliVal.textContent = aliSlider.value;
+});
+cohSlider.addEventListener("input", () => {
+    cohVal.textContent = cohSlider.value;
+});
+
+// Left click: drag camera
+// Right click: switch attract/repel
+canvas.addEventListener('mousedown', (e) => {
+    if (e.button === 0) {
+        isDragging = true;
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+    } else if (e.button === 2) {
+        if (mouseActive === 1) {
+            mouseMode = 1 - mouseMode;
+            updateModeLabel();
+        }
+    }
+});
+
+// Handle dragging the camera
+window.addEventListener('mousemove', (e) => {
+    if (isDragging) {
+        const dx = e.clientX - lastMouseX;
+        const dy = e.clientY - lastMouseY;
+
+        cameraAngle -= dx * 0.005;
+        cameraPhi += dy * 0.005;
+        cameraPhi = Math.max(0.1, Math.min(1.5, cameraPhi));
+
+        lastMouseX = e.clientX;
+        lastMouseY = e.clientY;
+    }
+});
+
+// Disable dragging the camera
+canvas.addEventListener('mouseup', (e) => {
+    if (e.button === 0) {
+        isDragging = false;
+    }
+});
+
+// Prevent right-click context menu
+canvas.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+})
+
+// Zoom in the camera
+canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    cameraDistance += e.deltaY * 0.5;
+    cameraDistance = Math.max(200, Math.min(2000, cameraDistance));
+});
+
+// Track mouse position for boid influence 
 canvas.addEventListener('mousemove', (e) => {
     const rect = canvas.getBoundingClientRect();
     mouseX = (e.clientX - rect.left) / canvas.width;
     mouseY = (e.clientY - rect.top) / canvas.height;
-});
-
-// left click toggles between repel/attract mode
-canvas.addEventListener('click', (e) => {
-    if (mouseActive == 1) {
-        mouseMode = 1 - mouseMode;
-        updateModeLabel();
-    }
 });
 
 // Toggle mouse influence on/off
@@ -335,23 +400,16 @@ mouseToggle.addEventListener('click', () => {
 
 // Update mode label
 function updateModeLabel() {
-    const labels = document.querySelectorAll('.control-group label');
-    const modeLabel = labels[labels.length - 1];
+    const modeLabel = document.getElementById('modeLabel');
+    if (!modeLabel) return;
     if (mouseActive === 0) {
         modeLabel.textContent = 'Mouse influence in OFF';
     } else if (mouseMode === 0) {
-        modeLabel.textContent = 'Mode: REPEL (click to switch)';
+        modeLabel.textContent = 'Mode: REPEL (Right click to switch)';
     } else {
-        modeLabel.textContent = 'Mode: ATTRACT (click to switch)';
+        modeLabel.textContent = 'Mode: ATTRACT (Right click to switch)';
     }
 }
-
-// Orbit camera with arrow keys
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowLeft') cameraAngle -= 0.05;
-    if (e.key === 'ArrowRight') cameraAngle += 0.05;
-});
-
 
 //=====================================================================================
 //=====================================================================================
@@ -374,6 +432,11 @@ function render(timestamp) {
     uniformData[1] = deltaTime;               
     uniformData[2] = canvas.width;
     uniformData[3] = canvas.height;
+
+    // Weights
+    uniformData[11] = parseFloat(sepSlider.value);
+    uniformData[12] = parseFloat(aliSlider.value); 
+    uniformData[13] = parseFloat(cohSlider.value);
     
     // mouse values
     uniformData[14] = mouseX;
@@ -386,9 +449,9 @@ function render(timestamp) {
     uniformData[18] = cam.x;
     uniformData[19] = cam.y;
     uniformData[20] = cam.z;
-    uniformData[21] = cameraTarget.x;
-    uniformData[22] = cameraTarget.y;
-    uniformData[23] = cameraTarget.z;
+    uniformData[21] = cameraTargetX;
+    uniformData[22] = cameraTargetY;
+    uniformData[23] = cameraTargetZ;
     
     device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
