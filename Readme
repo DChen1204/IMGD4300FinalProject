@@ -1,3 +1,6 @@
 This is Diwen Chen's IMGD 4300 Final Project - Boids Simulation.
-(Explain what I did)
+A 3d Boids simulation without using helper libraries. 
+User may drag the camera, repel/attract boids, and adjust the parameters. 
+The theme is Order & Chaos. Thousands of boids may fly in unison patterns,
+or scatter and descend into chaos. 
 Check out the website at: https://dchen1204.github.io/IMGD4300FinalProject/ 
