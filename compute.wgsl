@@ -204,7 +204,7 @@ fn cs(@builtin(global_invocation_id) global_id: vec3u) {
     newVel += alignmentForce * uniforms.alignmentWeight;
     newVel += cohesionForce * uniforms.cohesionWeight;
 
-    // #D Mouse interaction
+    // 3D Mouse interaction
     if (uniforms.mouseActive > 0.5) {
 
         // Get the camera

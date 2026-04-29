@@ -153,7 +153,7 @@ fn vs(input: VertexInput) -> VertexOutput {
     let speed = length(boid.vel) / uniforms.maxSpeed;
     let color = mix(
         vec3f(0.2, 0.5, 1.0),   // Slow boid: blue
-        vec3f(1.0, 0.3, 0.1),   // Fast boid: orange red
+        vec3f(1.0, 0.3, 0.1),   // Fast boid: red
         speed
     );
 

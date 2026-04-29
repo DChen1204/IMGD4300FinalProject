@@ -163,7 +163,7 @@ uniformData[20] = 0.0;              // cameraPosZ
 uniformData[21] = 0.0;              // cameraTargetX
 uniformData[22] = 0.0;              // cameraTargetY
 uniformData[23] = 0.0;              // cameraTargetZ
-// paddings
+
 
 //=====================================================================================
 //=====================================================================================
@@ -432,18 +432,15 @@ function render(timestamp) {
     uniformData[1] = deltaTime;               
     uniformData[2] = canvas.width;
     uniformData[3] = canvas.height;
-
     // Weights
     uniformData[11] = parseFloat(sepSlider.value);
     uniformData[12] = parseFloat(aliSlider.value); 
     uniformData[13] = parseFloat(cohSlider.value);
-    
     // mouse values
     uniformData[14] = mouseX;
     uniformData[15] = mouseY;
     uniformData[16] = mouseActive;
     uniformData[17] = mouseMode;
-
     // camera values
     const cam = getCameraPosition();
     uniformData[18] = cam.x;
@@ -452,7 +449,6 @@ function render(timestamp) {
     uniformData[21] = cameraTargetX;
     uniformData[22] = cameraTargetY;
     uniformData[23] = cameraTargetZ;
-    
     device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
     // Create a command encoder (used to record commands that will be sent to the GPU)
@@ -494,7 +490,6 @@ function render(timestamp) {
     boidRenderPass.setBindGroup(0, renderBindGroup);
     boidRenderPass.draw(12, NUM_BOIDS);
     boidRenderPass.end();
-
 
     // Submit the recorded commands to the GPU for execution
     device.queue.submit([encoder.finish()]);
